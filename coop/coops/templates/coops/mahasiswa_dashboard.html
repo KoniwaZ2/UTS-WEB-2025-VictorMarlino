@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Mahasiswa</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container mt-4">
+      <h2 class="mb-4">Dashboard Mahasiswa</h2>
+      <p>
+        {% if mahasiswa %}
+          <strong>Nama:</strong>
+          {% if mahasiswa.nama.get_full_name %}
+            {{ mahasiswa.nama.get_full_name }}
+          {% else %}
+            {{ mahasiswa.nama.username }}
+          {% endif %}
+        {% endif %}
+      </p>
+
+      {% comment %} Role check is handled by the view/decorator. Present UI for authenticated mahasiswa users. {% endcomment %}
+
+      {% if request.user.is_authenticated %}
+        {% if magang %}
+          <div class="card mb-3">
+            <div class="card-body">
+              <h5 class="card-title">Detail Magang</h5>
+              <p>
+                <strong>Periode:</strong>
+                {% if magang.periode_awal %}{{ magang.periode_awal|date:"Y-m-d" }}{% endif %}
+                {% if magang.periode_awal and magang.periode_akhir %} &mdash; {% endif %}
+                {% if magang.periode_akhir %}{{ magang.periode_akhir|date:"Y-m-d" }}{% endif %}
+              </p>
+              <p><strong>Perusahaan:</strong> {{ magang.nama_perusahaan }}</p>
+              <p><strong>Posisi:</strong> {{ magang.posisi }}</p>
+              <p><strong>Supervisor:</strong> {{ magang.nama_supervisor }} ({{ magang.email_supervisor }})</p>
+              <p>
+                <strong>Status:</strong>
+                <span class="badge {% if magang.status == 'accepted' %}bg-success{% elif magang.status == 'rejected' %}bg-danger{% else %}bg-secondary{% endif %}">
+                  {{ magang.get_status_display }}
+                </span>
+              </p>
+              {% if magang.surat_penerimaan %}
+                <a href="{{ magang.surat_penerimaan.url }}" target="_blank" class="btn btn-sm btn-outline-primary">Lihat Surat</a>
+              {% endif %}
+            </div>
+          </div>
+        {% else %}
+          <p class="mb-3">Anda belum mengajukan konfirmasi magang.</p>
+          <a href="{% url 'coops:konfirmasi_magang' %}" class="btn btn-primary">Konfirmasi Magang</a>
+        {% endif %}
+      {% else %}
+        <p>Silakan login untuk melihat dashboard.</p>
+      {% endif %}
+    </div>
+  </body>
+</html>

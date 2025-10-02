@@ -1,0 +1,14 @@
+<h2>Buat Lowongan Baru</h2>
+<form method="post" action="{% url 'create_lowongan' %}">
+  {% csrf_token %}
+  <div class="mb-3">
+    <input
+      type="text"
+      class="form-control"
+      name="judul"
+      placeholder="Judul Lowongan"
+      required
+    />
+  </div>
+  <button type="submit">Simpan</button>
+</form>

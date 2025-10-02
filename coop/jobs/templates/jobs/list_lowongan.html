@@ -1,0 +1,13 @@
+<h2>Daftar Lowongan</h2>
+<ul>
+  {% for low in lowongan_list %}
+  <li>
+    <strong>{{ low.posisi }}</strong> di {{ low.perusahaan }} (Deadline: {{
+    low.deadline }})
+    <br />
+    {{ low.deskripsi }}
+  </li>
+  {% empty %}
+  <li>Tidak ada lowongan tersedia.</li>
+  {% endfor %}
+</ul>

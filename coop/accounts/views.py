@@ -4,13 +4,15 @@ from django.shortcuts import render, redirect
 from .models import User, Mahasiswa
 from .forms import CustomLoginForm
 from django.urls import reverse
+from django.contrib import messages
+from django.db import transaction
+from django.db.utils import IntegrityError
 
 class CustomLoginView(LoginView):
     template_name = "accounts/login.html"
     form_class = CustomLoginForm
 
     def form_valid(self, form):
-        # CustomLoginForm stores the authenticated user in cleaned_data['user']
         user = form.cleaned_data.get('user')
         login(self.request, user)
 
@@ -31,23 +33,47 @@ def register(request):
         action = request.POST.get("action")
 
         if action == "register":
-            user = User.objects.create_user(
-                username=request.POST.get("email"),  # Menggunakan email sebagai username
-                email=request.POST.get("email"),
-                password=request.POST.get("password"),
-                role="mahasiswa"
-            )
-            
-            Mahasiswa.objects.create(
-                nama=user,
-                nim=request.POST.get("nim"),
-                prodi=request.POST.get("prodi"),
-                angkatan=request.POST.get("angkatan"),
-                jenis_kelamin=request.POST.get("jenis_kelamin"),
-                email=request.POST.get("email"),
-                no_hp=request.POST.get("no_hp"),
-                konsultasi=request.POST.get("konsultasi", ""),
-                sptjm=request.POST.get("sptjm", ""),
-            )
-            return redirect("login")
+            email = request.POST.get("email")
+            password = request.POST.get("password")
+            nama_lengkap = request.POST.get("nama")
+
+            # Prevent duplicate usernames/emails
+            if User.objects.filter(username=email).exists():
+                messages.error(request, "Email sudah terdaftar. Silakan gunakan email lain atau login.")
+                return render(request, "accounts/register.html")
+
+            try:
+                with transaction.atomic():
+                    user = User.objects.create_user(
+                        username=email,
+                        email=email,
+                        password=password,
+                        role="mahasiswa"
+                    )
+
+                    # store full name on the User record as-is
+                    if nama_lengkap:
+                        user.first_name = nama_lengkap.strip()
+                        user.save()
+
+                    # Create Mahasiswa record linking to the created user
+                    Mahasiswa.objects.create(
+                        nama=nama_lengkap,
+                        nim=request.POST.get("nim"),
+                        prodi=request.POST.get("prodi"),
+                        angkatan=int(request.POST.get("angkatan")) if request.POST.get("angkatan") else None,
+                        jenis_kelamin=request.POST.get("jenis_kelamin"),
+                        email=user,
+                        no_hp=request.POST.get("no_hp"),
+                        konsultasi=request.POST.get("konsultasi", ""),
+                        sptjm=request.POST.get("sptjm", ""),
+                    )
+
+                messages.success(request, "Registrasi berhasil! Silakan masuk.")
+                return redirect("login")
+            except IntegrityError:
+                messages.error(request, "Terjadi kesalahan pada server saat membuat akun. Silakan coba lagi.")
+                return render(request, "accounts/register.html")
+        else:
+            messages.error(request, "Terjadi kesalahan saat registrasi. Silakan coba lagi.")
     return render(request, "accounts/register.html")

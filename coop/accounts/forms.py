@@ -6,7 +6,7 @@ from .models import User
 class CustomLoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={
-            'class': 'form-control',
+            'class': 'form-control form-custom',
             'placeholder': 'Email',
             'required': True
         }),
@@ -14,7 +14,7 @@ class CustomLoginForm(forms.Form):
     )
     password = forms.CharField(
         widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
+            'class': 'form-control form-custom',
             'placeholder': 'Password',
             'required': True
         }),

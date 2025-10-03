@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-_qi9q!=#+aix!1+o%itsgd$-210y5j80pn4)8prr7!=x8!0(d4
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['testserver', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -135,6 +135,20 @@ USE_TZ = True
 
 # Use absolute URL path for static files so templates generate '/static/...' URLs
 STATIC_URL = '/static/'
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development
+# For production, use SMTP:
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your-app-password'
+
+DEFAULT_FROM_EMAIL = 'noreply@uts.ac.id'
+KAPRODI_EMAIL = 'kaprodi@uts.ac.id'
+MENTOR_EMAIL = 'mentor@uts.ac.id'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

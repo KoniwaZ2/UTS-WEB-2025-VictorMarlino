@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     KonfirmasiMagang, WeeklyReport, EvaluasiTemplate, 
-    EvaluasiSupervisor, LaporanKemajuan, LaporanAkhir
+    EvaluasiSupervisor, LaporanKemajuan, LaporanAkhir, SertifikatCoop
 )
 from django.core.mail import send_mail
 from django.conf import settings
@@ -238,6 +238,99 @@ class LaporanAkhirAdmin(admin.ModelAdmin):
     list_filter = ('status',)
     search_fields = ('konfirmasi__mahasiswa__username',)
     readonly_fields = ('submitted_at', 'approved_at', 'created_at', 'updated_at')
+
+
+@admin.register(SertifikatCoop)
+class SertifikatCoopAdmin(admin.ModelAdmin):
+    list_display = ('nomor_sertifikat', 'get_mahasiswa_name', 'get_nim', 'nilai_akhir', 'status', 'tanggal_kelulusan', 'dikeluarkan_oleh')
+    list_filter = ('status', 'nilai_akhir', 'tanggal_kelulusan')
+    search_fields = (
+        'nomor_sertifikat', 
+        'konfirmasi__mahasiswa__username', 
+        'konfirmasi__mahasiswa__first_name',
+        'konfirmasi__mahasiswa__last_name'
+    )
+    readonly_fields = ('nomor_sertifikat', 'tanggal_kelulusan', 'created_at', 'updated_at')
+    actions = ['issue_certificates', 'revoke_certificates', 'download_certificate_report']
+    
+    fieldsets = (
+        ('Informasi Sertifikat', {
+            'fields': ('nomor_sertifikat', 'konfirmasi', 'nilai_akhir', 'status')
+        }),
+        ('Metadata', {
+            'fields': ('tanggal_kelulusan', 'dikeluarkan_oleh', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_mahasiswa_name(self, obj):
+        try:
+            mahasiswa = obj.konfirmasi.mahasiswa.mahasiswa
+            return mahasiswa.nama
+        except:
+            return obj.konfirmasi.mahasiswa.get_full_name() or obj.konfirmasi.mahasiswa.username
+    get_mahasiswa_name.short_description = 'Nama Mahasiswa'
+    get_mahasiswa_name.admin_order_field = 'konfirmasi__mahasiswa__first_name'
+
+    def get_nim(self, obj):
+        try:
+            mahasiswa = obj.konfirmasi.mahasiswa.mahasiswa
+            return mahasiswa.nim
+        except:
+            return '-'
+    get_nim.short_description = 'NIM'
+
+    def issue_certificates(self, request, queryset):
+        """Terbitkan sertifikat terpilih"""
+        updated = queryset.update(status='issued')
+        self.message_user(request, f"{updated} sertifikat berhasil diterbitkan.")
+    issue_certificates.short_description = "Terbitkan sertifikat"
+
+    def revoke_certificates(self, request, queryset):
+        """Cabut sertifikat terpilih"""
+        updated = queryset.update(status='revoked')
+        self.message_user(request, f"{updated} sertifikat berhasil dicabut.")
+    revoke_certificates.short_description = "Cabut sertifikat"
+
+    def download_certificate_report(self, request, queryset):
+        """Download laporan sertifikat dalam format CSV"""
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="certificate_report.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow([
+            'Nomor Sertifikat', 'Nama Mahasiswa', 'NIM', 'Program Studi', 
+            'Perusahaan', 'Periode Awal', 'Periode Akhir', 'Nilai', 
+            'Status', 'Tanggal Kelulusan', 'Dikeluarkan Oleh'
+        ])
+        
+        for sertifikat in queryset.select_related('konfirmasi__mahasiswa'):
+            try:
+                mahasiswa = sertifikat.konfirmasi.mahasiswa.mahasiswa
+                nama = mahasiswa.nama
+                nim = mahasiswa.nim
+                prodi = mahasiswa.prodi
+            except:
+                nama = sertifikat.konfirmasi.mahasiswa.get_full_name() or sertifikat.konfirmasi.mahasiswa.username
+                nim = '-'
+                prodi = '-'
+            
+            writer.writerow([
+                sertifikat.nomor_sertifikat,
+                nama,
+                nim,
+                prodi,
+                sertifikat.konfirmasi.nama_perusahaan,
+                sertifikat.konfirmasi.periode_awal.strftime('%Y-%m-%d') if sertifikat.konfirmasi.periode_awal else '',
+                sertifikat.konfirmasi.periode_akhir.strftime('%Y-%m-%d') if sertifikat.konfirmasi.periode_akhir else '',
+                sertifikat.get_nilai_akhir_display(),
+                sertifikat.get_status_display(),
+                sertifikat.tanggal_kelulusan.strftime('%Y-%m-%d'),
+                sertifikat.dikeluarkan_oleh.get_full_name() if sertifikat.dikeluarkan_oleh else ''
+            ])
+        
+        return response
+    download_certificate_report.short_description = "Download laporan sertifikat"
 
 
 def notify_kaprodi_mentor(modeladmin, request, queryset):

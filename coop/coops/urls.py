@@ -14,6 +14,7 @@ urlpatterns = [
     path("laporan-kemajuan/", views.laporan_kemajuan, name="laporan_kemajuan"),
     path("laporan-kemajuan/<str:bulan>/", views.laporan_kemajuan, name="laporan_kemajuan_bulan"),
     path("daftar-laporan-kemajuan/", views.daftar_laporan_kemajuan, name="daftar_laporan_kemajuan"),
+    path("laporan-mahasiswa/", views.laporan_mahasiswa, name="laporan_mahasiswa"),
     
     # Laporan Akhir (UAS)
     path("laporan-akhir/", views.laporan_akhir, name="laporan_akhir"),
@@ -21,7 +22,12 @@ urlpatterns = [
     # Evaluasi Supervisor
     path("evaluasi/<int:konfirmasi_id>/<int:template_id>/", views.evaluasi_supervisor, name="evaluasi_supervisor"),
     path("evaluasi/hasil/<int:konfirmasi_id>/<int:template_id>/", views.hasil_evaluasi, name="hasil_evaluasi"),
+    path("evaluasi/kirim-kaprodi/<int:template_id>/", views.kirim_ke_kaprodi, name="kirim_ke_kaprodi"),
     
     # Admin tracking
     path("tracking-evaluasi/", views.tracking_evaluasi, name="tracking_evaluasi"),
+    
+    # Sertifikat Coop
+    path("sertifikat/", views.sertifikat_coop, name="sertifikat_coop"),
+    path("generate-sertifikat/<int:konfirmasi_id>/", views.generate_sertifikat, name="generate_sertifikat"),
 ]

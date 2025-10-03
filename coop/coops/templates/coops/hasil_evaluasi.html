@@ -170,6 +170,9 @@
                                 <button class="btn btn-success" onclick="sendToEmail()">
                                     <i class="bi bi-envelope me-1"></i>Kirim via Email
                                 </button>
+                                <button class="btn btn-info" onclick="sendToKaprodi()">
+                                    <i class="bi bi-send me-1"></i>Kirim ke Kaprodi & Mentor
+                                </button>
                             </div>
                             <div>
                                 <a href="{% url 'coops:tracking_evaluasi' %}" class="btn btn-secondary">
@@ -198,6 +201,12 @@
             if (confirm('Kirim hasil evaluasi ini via email?')) {
                 // TODO: Implement email sending
                 alert('Fitur kirim email akan diimplementasikan');
+            }
+        }
+        function sendToKaprodi() {
+            if (confirm('Kirim hasil evaluasi ini ke Kaprodi & Mentor?')) {
+                // TODO: Implement email sending
+                alert('Fitur kirim ke Kaprodi & Mentor akan diimplementasikan');
             }
         }
 

@@ -38,6 +38,7 @@
       </div>
     </nav>
 
+    {% csrf_token %}
     <div class="container mt-4">
         <!-- Header Section -->
         <div class="row mb-4">
@@ -253,8 +254,21 @@
 
         function sendToKaprodi(templateId) {
             if (confirm('Kirim hasil evaluasi ke Kaprodi dan Mentor?')) {
-                // TODO: Implement sending to Kaprodi/Mentor
-                alert('Fitur kirim ke Kaprodi/Mentor akan diimplementasikan');
+                // Create a form to submit POST request
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/coops/evaluasi/kirim-kaprodi/' + templateId + '/';
+                
+                // Add CSRF token
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrfmiddlewaretoken';
+                csrfInput.value = document.querySelector('[name=csrfmiddlewaretoken]').value || '{{ csrf_token }}';
+                form.appendChild(csrfInput);
+                
+                // Add form to document and submit
+                document.body.appendChild(form);
+                form.submit();
             }
         }
 

@@ -134,3 +134,50 @@ class LaporanAkhir(models.Model):
 
     def __str__(self):
         return f"Laporan Akhir - {self.konfirmasi.mahasiswa.username}"
+
+
+class SertifikatCoop(models.Model):
+    """Sertifikat yang diberikan kepada mahasiswa yang telah menyelesaikan program coop"""
+    konfirmasi = models.OneToOneField(KonfirmasiMagang, on_delete=models.CASCADE, related_name='sertifikat')
+    
+    # Data sertifikat
+    nomor_sertifikat = models.CharField(max_length=50, unique=True)
+    nilai_akhir = models.CharField(max_length=2, choices=[
+        ('A', 'A (Sangat Baik)'),
+        ('B', 'B (Baik)'),
+        ('C', 'C (Cukup)'),
+        ('D', 'D (Kurang)'),
+    ], help_text="Konversi nilai untuk mata kuliah Coop")
+    
+    # Metadata
+    tanggal_kelulusan = models.DateField(auto_now_add=True)
+    dikeluarkan_oleh = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, limit_choices_to={'role': 'admin'})
+    
+    # Status
+    status = models.CharField(max_length=20, choices=[
+        ('draft', 'Draft'),
+        ('issued', 'Diterbitkan'),
+        ('revoked', 'Dicabut'),
+    ], default='draft')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Sertifikat {self.nomor_sertifikat} - {self.konfirmasi.mahasiswa.get_full_name()}"
+    
+    def generate_nomor_sertifikat(self):
+        """Generate unique certificate number"""
+        from datetime import datetime
+        year = datetime.now().year
+        # Count existing certificates this year
+        count = SertifikatCoop.objects.filter(
+            created_at__year=year
+        ).count() + 1
+        
+        return f"COOP/{year}/{count:04d}/UTS"
+
+    def save(self, *args, **kwargs):
+        if not self.nomor_sertifikat:
+            self.nomor_sertifikat = self.generate_nomor_sertifikat()
+        super().save(*args, **kwargs)

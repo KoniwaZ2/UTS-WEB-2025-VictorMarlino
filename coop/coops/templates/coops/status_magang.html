@@ -155,6 +155,9 @@
                   <th class="py-3">
                     <i class="bi bi-file-earmark me-2"></i>Surat
                   </th>
+                  <th class="py-3">
+                    <i class="bi bi-gear me-2"></i>Aksi
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -236,6 +239,27 @@
                       <a href="{{ magang.surat_penerimaan.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-file-earmark-pdf me-1"></i>Lihat
                       </a>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3">
+                    {% if magang %}
+                      <div class="btn-group btn-group-sm" role="group">
+                        {% if magang.status == 'completed' %}
+                          <a href="{% url 'coops:generate_sertifikat' magang.id %}" class="btn btn-success" title="Generate Sertifikat">
+                            <i class="bi bi-award"></i>
+                          </a>
+                          {% if magang.sertifikat %}
+                            <a href="{% url 'coops:sertifikat_coop' %}" class="btn btn-outline-success" title="Lihat Sertifikat" target="_blank">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                          {% endif %}
+                        {% endif %}
+                        <a href="/admin/coops/konfirmasimagang/{{ magang.id }}/change/" class="btn btn-outline-secondary" title="Edit">
+                          <i class="bi bi-pencil"></i>
+                        </a>
+                      </div>
                     {% else %}
                       <span class="text-muted">—</span>
                     {% endif %}

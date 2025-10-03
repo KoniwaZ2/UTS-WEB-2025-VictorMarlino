@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from accounts.decorators import mahasiswa_required
 from django.contrib import messages
-from .models import KonfirmasiMagang
+from .models import KonfirmasiMagang, LaporanKemajuan
+from accounts.models import Mahasiswa
 from django.http import HttpResponse
 from django.template import loader
 from .forms import WeeklyReportForm
@@ -127,7 +128,7 @@ def status_magang(request):
 
     # Calculate statistics
     all_konfirmasi = KonfirmasiMagang.objects.all()
-    accepted_count = all_konfirmasi.filter(status='accepted').count()
+    accepted_count = all_konfirmasi.filter(status__in=['accepted', 'completed']).count()
     pending_count = all_konfirmasi.filter(status='pending').count()
     rejected_count = all_konfirmasi.filter(status='rejected').count()
 
@@ -397,11 +398,10 @@ def laporan_akhir(request):
             if existing_laporan:
                 # Update existing
                 existing_laporan.ringkasan_kegiatan = request.POST.get('ringkasan_kegiatan')
-                existing_laporan.pencapaian_tujuan = request.POST.get('pencapaian_tujuan')
-                existing_laporan.keterampilan_yang_diperoleh = request.POST.get('keterampilan_yang_diperoleh')
-                existing_laporan.kesulitan_dan_solusi = request.POST.get('kesulitan_dan_solusi')
-                existing_laporan.saran_untuk_program = request.POST.get('saran_untuk_program')
-                existing_laporan.refleksi_personal = request.POST.get('refleksi_personal')
+                existing_laporan.pencapaian = request.POST.get('pencapaian')
+                existing_laporan.kendala_solusi = request.POST.get('kendala_solusi')
+                existing_laporan.saran_perusahaan = request.POST.get('saran_perusahaan')
+                existing_laporan.saran_kampus = request.POST.get('saran_kampus')
                 existing_laporan.status = 'submitted'
                 existing_laporan.submitted_at = timezone.now()
                 existing_laporan.save()
@@ -411,11 +411,10 @@ def laporan_akhir(request):
                 laporan = LaporanAkhir.objects.create(
                     konfirmasi=konfirmasi,
                     ringkasan_kegiatan=request.POST.get('ringkasan_kegiatan'),
-                    pencapaian_tujuan=request.POST.get('pencapaian_tujuan'),
-                    keterampilan_yang_diperoleh=request.POST.get('keterampilan_yang_diperoleh'),
-                    kesulitan_dan_solusi=request.POST.get('kesulitan_dan_solusi'),
-                    saran_untuk_program=request.POST.get('saran_untuk_program'),
-                    refleksi_personal=request.POST.get('refleksi_personal'),
+                    pencapaian=request.POST.get('pencapaian'),
+                    kendala_solusi=request.POST.get('kendala_solusi'),
+                    saran_perusahaan=request.POST.get('saran_perusahaan'),
+                    saran_kampus=request.POST.get('saran_kampus'),
                     status='submitted',
                     submitted_at=timezone.now()
                 )
@@ -597,3 +596,228 @@ def daftar_laporan_kemajuan(request):
     }
     
     return render(request, 'coops/daftar_laporan_kemajuan.html', context)
+
+
+@login_required
+def laporan_mahasiswa(request):
+    """View untuk mahasiswa melihat daftar laporan kemajuan mereka sendiri"""
+    if request.user.role != "mahasiswa":
+        messages.error(request, "Akses ditolak. Anda bukan mahasiswa.")
+        return redirect("/")
+        
+    try:
+        mahasiswa = Mahasiswa.objects.get(email=request.user)
+        konfirmasi = KonfirmasiMagang.objects.get(mahasiswa=request.user)
+        
+        if konfirmasi.status not in ['accepted', 'completed']:
+            messages.warning(request, "Anda belum memiliki magang yang disetujui.")
+            return redirect('coops:mahasiswa_dashboard')
+            
+        laporan_list = LaporanKemajuan.objects.filter(konfirmasi=konfirmasi).order_by('-created_at')
+        
+        context = {
+            'laporan_list': laporan_list,
+            'konfirmasi': konfirmasi,
+            'mahasiswa': mahasiswa,
+            'total_laporan': laporan_list.count(),
+        }
+        
+        return render(request, 'coops/laporan_mahasiswa.html', context)
+        
+    except Mahasiswa.DoesNotExist:
+        messages.error(request, "Data mahasiswa tidak ditemukan. Silakan hubungi admin.")
+        return redirect('coops:mahasiswa_dashboard')
+    except KonfirmasiMagang.DoesNotExist:
+        messages.warning(request, "Anda belum mengajukan konfirmasi magang.")
+        return redirect('coops:mahasiswa_dashboard')
+
+
+@login_required
+def kirim_ke_kaprodi(request, template_id):
+    """View untuk admin mengirim hasil evaluasi ke Kaprodi dan Mentor"""
+    if request.user.role != "admin":
+        messages.error(request, "Akses ditolak. Anda bukan admin.")
+        return redirect("/")
+    
+    if request.method != 'POST':
+        messages.error(request, "Method tidak diizinkan.")
+        return redirect('coops:tracking_evaluasi')
+    
+    from .models import EvaluasiTemplate, EvaluasiSupervisor
+    from django.core.mail import send_mail
+    from django.template.loader import render_to_string
+    from django.utils.html import strip_tags
+    import json
+    
+    try:
+        template = EvaluasiTemplate.objects.get(id=template_id)
+    except EvaluasiTemplate.DoesNotExist:
+        messages.error(request, 'Template evaluasi tidak ditemukan.')
+        return redirect('coops:tracking_evaluasi')
+    
+    # Get all completed evaluations for this template
+    completed_evaluations = EvaluasiSupervisor.objects.filter(
+        template=template, 
+        status='completed'
+    ).select_related('konfirmasi__mahasiswa')
+    
+    if not completed_evaluations.exists():
+        messages.error(request, 'Tidak ada evaluasi yang sudah diselesaikan untuk template ini.')
+        return redirect('coops:tracking_evaluasi')
+    
+    # Prepare email content
+    try:
+        # Parse questions for better email formatting
+        questions = json.loads(template.pertanyaan) if template.pertanyaan else []
+        
+        # Prepare evaluation summary data
+        evaluation_summary = []
+        for evaluasi in completed_evaluations:
+            # Combine questions with answers
+            qa_pairs = []
+            for i, question in enumerate(questions):
+                answer = 'Tidak dijawab'
+                if evaluasi.jawaban:
+                    answer = evaluasi.jawaban.get(str(i)) or evaluasi.jawaban.get(i) or 'Tidak dijawab'
+                
+                qa_pairs.append({
+                    'question': question,
+                    'answer': answer
+                })
+            
+            evaluation_summary.append({
+                'mahasiswa': evaluasi.konfirmasi.mahasiswa,
+                'supervisor': evaluasi.konfirmasi.nama_supervisor,
+                'perusahaan': evaluasi.konfirmasi.nama_perusahaan,
+                'posisi': evaluasi.konfirmasi.posisi,
+                'submitted_at': evaluasi.submitted_at,
+                'qa_pairs': qa_pairs
+            })
+        
+        # Email context
+        email_context = {
+            'template': template,
+            'evaluation_summary': evaluation_summary,
+            'total_evaluations': completed_evaluations.count(),
+            'admin_user': request.user
+        }
+        
+        # Render email templates
+        subject = f'Hasil Evaluasi {template.get_jenis_display()} - {template.nama}'
+        html_message = render_to_string('coops/email_hasil_evaluasi.html', email_context)
+        plain_message = strip_tags(html_message)
+        
+        # Email addresses (you should configure these in settings or as admin preferences)
+        kaprodi_email = getattr(settings, 'KAPRODI_EMAIL', 'kaprodi@university.edu')
+        mentor_email = getattr(settings, 'MENTOR_EMAIL', 'mentor@university.edu')
+        
+        recipient_list = [kaprodi_email, mentor_email]
+        
+        # Send email
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipient_list,
+            html_message=html_message,
+            fail_silently=False
+        )
+        
+        # Mark template as sent (you might want to add a field to track this)
+        # For now, we'll just show success message
+        messages.success(request, 
+            f'Hasil evaluasi {template.nama} berhasil dikirim ke Kaprodi dan Mentor. '
+            f'Total {completed_evaluations.count()} evaluasi telah dikirim.')
+        
+    except Exception as e:
+        messages.error(request, f'Gagal mengirim email: {str(e)}')
+    
+    return redirect('coops:tracking_evaluasi')
+
+
+@login_required
+def sertifikat_coop(request):
+    """View untuk mahasiswa melihat/download sertifikat coop"""
+    if request.user.role != "mahasiswa":
+        messages.error(request, "Akses ditolak. Anda bukan mahasiswa.")
+        return redirect("/")
+    
+    try:
+        konfirmasi = KonfirmasiMagang.objects.get(mahasiswa=request.user, status='completed')
+    except KonfirmasiMagang.DoesNotExist:
+        messages.error(request, 'Anda belum menyelesaikan program coop atau status belum diubah ke completed.')
+        return redirect('coops:mahasiswa_dashboard')
+    
+    # Get or create certificate
+    from .models import SertifikatCoop
+    sertifikat, created = SertifikatCoop.objects.get_or_create(
+        konfirmasi=konfirmasi,
+        defaults={
+            'nilai_akhir': 'A',  # Default grade, should be set by admin
+            'status': 'issued'
+        }
+    )
+    
+    # Get mahasiswa data
+    try:
+        mahasiswa_obj = request.user.mahasiswa
+    except:
+        mahasiswa_obj = None
+    
+    context = {
+        'sertifikat': sertifikat,
+        'konfirmasi': konfirmasi,
+        'mahasiswa': mahasiswa_obj
+    }
+    
+    return render(request, 'coops/sertifikat_coop.html', context)
+
+
+@login_required
+def generate_sertifikat(request, konfirmasi_id):
+    """View untuk admin generate sertifikat untuk mahasiswa yang sudah completed"""
+    if request.user.role != "admin":
+        messages.error(request, "Akses ditolak. Anda bukan admin.")
+        return redirect("/")
+    
+    try:
+        konfirmasi = KonfirmasiMagang.objects.get(id=konfirmasi_id, status='completed')
+    except KonfirmasiMagang.DoesNotExist:
+        messages.error(request, 'Konfirmasi magang tidak ditemukan atau belum completed.')
+        return redirect('coops:status_magang')
+    
+    if request.method == 'POST':
+        nilai_akhir = request.POST.get('nilai_akhir', 'A')
+        
+        from .models import SertifikatCoop
+        sertifikat, created = SertifikatCoop.objects.get_or_create(
+            konfirmasi=konfirmasi,
+            defaults={
+                'nilai_akhir': nilai_akhir,
+                'dikeluarkan_oleh': request.user,
+                'status': 'issued'
+            }
+        )
+        
+        if not created:
+            # Update existing certificate
+            sertifikat.nilai_akhir = nilai_akhir
+            sertifikat.dikeluarkan_oleh = request.user
+            sertifikat.status = 'issued'
+            sertifikat.save()
+        
+        messages.success(request, f'Sertifikat berhasil diterbitkan untuk {konfirmasi.mahasiswa.get_full_name()}')
+        return redirect('coops:status_magang')
+    
+    # GET request - show form
+    try:
+        mahasiswa_obj = konfirmasi.mahasiswa.mahasiswa
+    except:
+        mahasiswa_obj = None
+    
+    context = {
+        'konfirmasi': konfirmasi,
+        'mahasiswa': mahasiswa_obj
+    }
+    
+    return render(request, 'coops/generate_sertifikat.html', context)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    KonfirmasiMagang, WeeklyReport, EvaluasiTemplate, 
+    KonfirmasiMagang, WeeklyReport, DeadlineReminder, EvaluasiTemplate, 
     EvaluasiSupervisor, LaporanKemajuan, LaporanAkhir, SertifikatCoop
 )
 from django.core.mail import send_mail
@@ -43,8 +43,22 @@ class KonfirmasiMagangAdmin(admin.ModelAdmin):
 
 @admin.register(WeeklyReport)
 class WeeklyReportAdmin(admin.ModelAdmin):
-    list_display = ('konfirmasi', 'week_start', 'created_at')
-    readonly_fields = ('created_at',)
+    list_display = ('student', 'week_number', 'week_start_date', 'application_status', 'submitted_at', 'is_late')
+    list_filter = ('application_status', 'is_late')
+    search_fields = ('student__username', 'student__first_name', 'student__last_name')
+    readonly_fields = ('submitted_at', 'created_at', 'updated_at')
+    ordering = ('-week_start_date', '-submitted_at')
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('student')
+
+
+@admin.register(DeadlineReminder)
+class DeadlineReminderAdmin(admin.ModelAdmin):
+    list_display = ('deadline_date', 'reminder_frequency_days', 'is_active', 'email_reminder_enabled', 'created_at')
+    list_filter = ('is_active', 'email_reminder_enabled')
+    readonly_fields = ('created_at', 'updated_at', 'days_until_deadline', 'is_overdue')
+    ordering = ('-created_at',)
 
 
 @admin.register(EvaluasiTemplate)

@@ -30,4 +30,10 @@ urlpatterns = [
     # Sertifikat Coop
     path("sertifikat/", views.sertifikat_coop, name="sertifikat_coop"),
     path("generate-sertifikat/<int:konfirmasi_id>/", views.generate_sertifikat, name="generate_sertifikat"),
+    
+    # Weekly Reports
+    path("weekly-report/", views.weekly_report, name="weekly_report"),
+    path("weekly-reports/", views.weekly_report_list, name="weekly_report_list"),
+    path("admin/weekly-reports/", views.admin_weekly_reports, name="admin_weekly_reports"),
+    path("admin/deadline-reminder/", views.manage_deadline_reminder, name="manage_deadline_reminder"),
 ]

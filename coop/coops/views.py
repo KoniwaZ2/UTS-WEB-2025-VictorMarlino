@@ -821,3 +821,343 @@ def generate_sertifikat(request, konfirmasi_id):
     }
     
     return render(request, 'coops/generate_sertifikat.html', context)
+
+
+# Weekly Report Views
+@login_required
+def weekly_report(request):
+    """View untuk mahasiswa membuat laporan mingguan"""
+    if request.user.role != "mahasiswa":
+        messages.error(request, "Akses ditolak. Anda bukan mahasiswa.")
+        return redirect("/")
+    
+    from .models import WeeklyReport, DeadlineReminder, KonfirmasiMagang
+    from .forms import WeeklyReportForm
+    from django.utils import timezone
+    
+    # Check if mahasiswa has confirmed internship
+    has_internship = KonfirmasiMagang.objects.filter(
+        mahasiswa__nama=request.user,
+        status='accepted'
+    ).exists()
+    
+    if has_internship:
+        messages.info(request, "Anda sudah mendapat tempat magang dan tidak perlu membuat laporan mingguan.")
+        return redirect('coops:mahasiswa_dashboard')
+    
+    # Check if there's active deadline
+    active_deadline = DeadlineReminder.objects.filter(is_active=True).first()
+    
+    if not active_deadline:
+        messages.warning(request, "Deadline magang belum diatur. Silakan hubungi admin.")
+        return redirect('coops:mahasiswa_dashboard')
+    
+    # Check if deadline has passed
+    today = timezone.now().date()
+    if today <= active_deadline.deadline_date:
+        messages.info(request, "Deadline magang belum terlewati. Laporan mingguan belum diperlukan.")
+        return redirect('coops:mahasiswa_dashboard')
+    
+    # Get current week start (Monday)
+    days_since_monday = today.weekday()
+    current_week_start = today - timezone.timedelta(days=days_since_monday)
+    current_week_end = current_week_start + timezone.timedelta(days=6)
+    
+    # Calculate week number since deadline
+    weeks_since_deadline = ((current_week_start - active_deadline.deadline_date).days // 7) + 1
+    
+    # Check if report already exists for this week
+    existing_report = WeeklyReport.objects.filter(
+        student=request.user,
+        week_start_date=current_week_start
+    ).first()
+    
+    if request.method == 'POST':
+        if existing_report:
+            form = WeeklyReportForm(request.POST, instance=existing_report)
+        else:
+            form = WeeklyReportForm(request.POST)
+            
+        if form.is_valid():
+            report = form.save(commit=False)
+            report.student = request.user
+            report.week_start_date = current_week_start
+            report.week_end_date = current_week_end
+            report.week_number = weeks_since_deadline
+            
+            # Check if submitted late
+            if today > current_week_end:
+                report.is_late = True
+                
+            report.save()
+            
+            messages.success(request, "Laporan mingguan berhasil disimpan.")
+            return redirect('coops:weekly_report_list')
+    else:
+        if existing_report:
+            form = WeeklyReportForm(instance=existing_report)
+        else:
+            form = WeeklyReportForm()
+    
+    context = {
+        'form': form,
+        'week_start': current_week_start,
+        'week_end': current_week_end,
+        'week_number': weeks_since_deadline,
+        'existing_report': existing_report,
+        'active_deadline': active_deadline,
+    }
+    
+    return render(request, 'coops/weekly_report.html', context)
+
+
+@login_required
+def weekly_report_list(request):
+    """View untuk melihat daftar laporan mingguan mahasiswa"""
+    if request.user.role != "mahasiswa":
+        messages.error(request, "Akses ditolak. Anda bukan mahasiswa.")
+        return redirect("/")
+    
+    from .models import WeeklyReport, DeadlineReminder
+    from django.utils import timezone
+    
+    # Get active deadline
+    active_deadline = DeadlineReminder.objects.filter(is_active=True).first()
+    
+    reports = WeeklyReport.objects.filter(student=request.user).order_by('-week_start_date')
+    
+    # Check if current week report is needed
+    today = timezone.now().date()
+    days_since_monday = today.weekday()
+    current_week_start = today - timezone.timedelta(days=days_since_monday)
+    
+    current_week_report = WeeklyReport.objects.filter(
+        student=request.user,
+        week_start_date=current_week_start
+    ).first()
+    
+    need_current_report = False
+    if active_deadline and today > active_deadline.deadline_date and not current_week_report:
+        need_current_report = True
+    
+    context = {
+        'reports': reports,
+        'active_deadline': active_deadline,
+        'current_week_start': current_week_start,
+        'current_week_report': current_week_report,
+        'need_current_report': need_current_report,
+        'total_reports': reports.count(),
+    }
+    
+    return render(request, 'coops/weekly_report_list.html', context)
+
+
+@login_required
+def admin_weekly_reports(request):
+    """View untuk admin melihat semua laporan mingguan"""
+    if request.user.role != "admin":
+        messages.error(request, "Akses ditolak. Anda bukan admin.")
+        return redirect("/")
+    
+    from .models import WeeklyReport, DeadlineReminder, KonfirmasiMagang
+    from accounts.models import User
+    from django.utils import timezone
+    
+    # Get all weekly reports
+    reports = WeeklyReport.objects.select_related('student').order_by('-week_start_date', 'student__username')
+    
+    # Get active deadline settings
+    active_deadline = DeadlineReminder.objects.filter(is_active=True).first()
+    
+    # Get mahasiswa who need to submit but haven't
+    overdue_mahasiswa = []
+    
+    if active_deadline:
+        today = timezone.now().date()
+        
+        # Get mahasiswa yang belum mendapat tempat magang (tidak ada konfirmasi yang accepted)
+        mahasiswa_without_internship = User.objects.filter(
+            role='mahasiswa'
+        ).exclude(
+            konfirmasimagang__status='accepted'
+        )
+        
+        # Cek yang melewati deadline
+        if today > active_deadline.deadline_date:
+            days_since_monday = today.weekday()
+            current_week_start = today - timezone.timedelta(days=days_since_monday)
+            
+            for mahasiswa in mahasiswa_without_internship:
+                # Cek apakah sudah submit laporan minggu ini
+                current_report = WeeklyReport.objects.filter(
+                    student=mahasiswa,
+                    week_start_date=current_week_start
+                ).first()
+                
+                if not current_report:
+                    overdue_mahasiswa.append({
+                        'mahasiswa': mahasiswa,
+                        'deadline': active_deadline.deadline_date,
+                        'days_overdue': (today - active_deadline.deadline_date).days
+                    })
+    
+    context = {
+        'reports': reports,
+        'overdue_mahasiswa': overdue_mahasiswa,
+        'active_deadline': active_deadline,
+        'total_reports': reports.count(),
+        'total_overdue': len(overdue_mahasiswa),
+    }
+    
+    return render(request, 'coops/admin_weekly_reports.html', context)
+
+
+@login_required
+def manage_deadline_reminder(request):
+    """View untuk admin mengatur deadline dan reminder global"""
+    if request.user.role != "admin":
+        messages.error(request, "Akses ditolak. Anda bukan admin.")
+        return redirect("/")
+    
+    from .models import DeadlineReminder, WeeklyReport
+    from .forms import DeadlineReminderForm
+    from django.utils import timezone
+    
+    # Get active deadline or create new one
+    active_deadline = DeadlineReminder.objects.filter(is_active=True).first()
+    
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+        
+        if action == 'create':
+            # Create new deadline
+            form = DeadlineReminderForm(request.POST)
+            if form.is_valid():
+                deadline = form.save(commit=False)
+                # Deactivate other deadlines first
+                DeadlineReminder.objects.update(is_active=False)
+                # Set this one as active
+                deadline.is_active = True
+                deadline.save()
+                messages.success(request, "Deadline baru berhasil dibuat dan diaktifkan.")
+                return redirect('coops:manage_deadline_reminder')
+            else:
+                messages.error(request, "Gagal membuat deadline. Periksa data yang dimasukkan.")
+                
+        elif action == 'update' and active_deadline:
+            # Update existing deadline
+            form = DeadlineReminderForm(request.POST, instance=active_deadline)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Pengaturan deadline berhasil diperbarui.")
+                return redirect('coops:manage_deadline_reminder')
+            else:
+                messages.error(request, "Gagal memperbarui deadline. Periksa data yang dimasukkan.")
+                
+        elif action == 'activate':
+            # Activate a specific deadline
+            reminder_id = request.POST.get('reminder_id')
+            if reminder_id:
+                try:
+                    # Deactivate all first
+                    DeadlineReminder.objects.update(is_active=False)
+                    # Activate selected one
+                    reminder = DeadlineReminder.objects.get(id=reminder_id)
+                    reminder.is_active = True
+                    reminder.save()
+                    messages.success(request, "Deadline berhasil diaktifkan.")
+                except DeadlineReminder.DoesNotExist:
+                    messages.error(request, "Deadline tidak ditemukan.")
+                return redirect('coops:manage_deadline_reminder')
+                
+        elif action == 'deactivate':
+            # Deactivate a specific deadline
+            reminder_id = request.POST.get('reminder_id')
+            if reminder_id:
+                try:
+                    reminder = DeadlineReminder.objects.get(id=reminder_id)
+                    reminder.is_active = False
+                    reminder.save()
+                    messages.success(request, "Deadline berhasil dinonaktifkan.")
+                except DeadlineReminder.DoesNotExist:
+                    messages.error(request, "Deadline tidak ditemukan.")
+                return redirect('coops:manage_deadline_reminder')
+        
+        else:
+            # Default form handling (backward compatibility)
+            if active_deadline:
+                form = DeadlineReminderForm(request.POST, instance=active_deadline)
+            else:
+                form = DeadlineReminderForm(request.POST)
+                
+            if form.is_valid():
+                deadline = form.save(commit=False)
+                
+                # Deactivate other deadlines first
+                DeadlineReminder.objects.update(is_active=False)
+                
+                # Set this one as active
+                deadline.is_active = True
+                deadline.save()
+                
+                messages.success(request, "Deadline berhasil disimpan dan diaktifkan.")
+                return redirect('coops:admin_weekly_reports')
+    else:
+        if active_deadline:
+            form = DeadlineReminderForm(instance=active_deadline)
+        else:
+            form = DeadlineReminderForm(initial={
+                'deadline_date': timezone.now().date() + timezone.timedelta(days=30),
+                'reminder_frequency_days': 7,
+                'description': 'Deadline pencarian tempat magang',
+                'email_reminder_enabled': True,
+                'is_active': True,
+            })
+    
+    # Get all deadline history
+    all_deadlines = DeadlineReminder.objects.all().order_by('-created_at')
+    
+    # Calculate statistics if there's an active deadline
+    stats = {}
+    if active_deadline:
+        from accounts.models import Mahasiswa
+        from datetime import date
+        
+        # Count total students
+        total_students = Mahasiswa.objects.count()
+        
+        # Calculate days until deadline
+        days_until = (active_deadline.deadline_date - date.today()).days
+        
+        # Count overdue students (students who passed deadline but haven't found internship)
+        overdue_students = Mahasiswa.objects.filter(
+            konfirmasimagang__isnull=True
+        ).count() if days_until < 0 else 0
+        
+        # Count weekly reports this week
+        from datetime import datetime, timedelta
+        week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())
+        weekly_reports_count = WeeklyReport.objects.filter(
+            submitted_at__date__gte=week_start
+        ).count()
+        
+        # Get recent reports
+        recent_reports = WeeklyReport.objects.select_related('student').order_by('-submitted_at')[:5]
+        
+        stats = {
+            'total_affected_students': total_students,
+            'days_until_deadline': max(0, days_until),
+            'overdue_students': overdue_students,
+            'weekly_reports_count': weekly_reports_count,
+            'recent_reports': recent_reports,
+        }
+    
+    context = {
+        'form': form,
+        'active_deadline': active_deadline,
+        'current_reminder': active_deadline,  # Add this for template compatibility
+        'all_deadlines': all_deadlines,
+        **stats  # Spread the stats dictionary
+    }
+    
+    return render(request, 'coops/manage_deadline_reminder.html', context)

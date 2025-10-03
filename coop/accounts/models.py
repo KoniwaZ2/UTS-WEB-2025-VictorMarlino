@@ -38,6 +38,8 @@ class Mahasiswa(models.Model):
     konsultasi = models.CharField(max_length=100, blank=True, null=True)
     sptjm = models.CharField(max_length=100, blank=True, null=True)
     magang = models.BooleanField(default=False)
+    porto = models.CharField(max_length=100, blank=True, null=True)
+    cv = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.nama} {self.nim} {self.prodi} {self.angkatan} {self.jenis_kelamin} {self.email} {self.no_hp} {self.konsultasi} {self.sptjm}"
+        return f"{self.nama} {self.nim} {self.prodi} {self.angkatan} {self.jenis_kelamin} {self.email} {self.no_hp} {self.konsultasi} {self.sptjm} {self.porto} {self.cv}"

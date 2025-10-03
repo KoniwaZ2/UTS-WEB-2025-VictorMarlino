@@ -9,6 +9,7 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="{% static 'style.css' %}" />
+    <link rel="stylesheet" href="{% static 'navbar-sticky.css' %}" />
   </head>
   <body class="d-flex align-items-center justify-content-center min-vh-100">
     <section class="bg-image p-4 mx-auto" style="width: 1000px;">
@@ -27,7 +28,7 @@
         {% endif %}
         <h2 class="text-center" style="font-weight: 600;">Register</h2>
         <h6 class="text-center mt-3">Silakan isi form di bawah ini</h6>
-        <form method="post" action="{% url 'register' %}" class="mt-4">
+        <form method="post" action="{% url 'accounts:register' %}" class="mt-4">
         {% csrf_token %}
         <input type="hidden" name="action" value="register" />
         <div class="row">
@@ -132,6 +133,52 @@
                 </div>
             </div>
         </div>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label for="konsul" class="form-label fw-semibold">Bukti Konsultasi Mentor</label>
+                    <input
+                    type="file"
+                    class="form-control form-custom"
+                    name="konsul"
+                    required
+                    />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label for="sptjm" class="form-label fw-semibold">Bukti SPTJM</label>
+                    <input
+                    type="file"
+                    class="form-control form-custom"
+                    name="sptjm"
+                    required
+                    />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label for="cv" class="form-label fw-semibold">CV</label>
+                    <input
+                    type="file"
+                    class="form-control form-custom"
+                    name="cv"
+                    required
+                    />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label for="porto" class="form-label fw-semibold">Portofolio</label>
+                    <input
+                    type="file"
+                    class="form-control form-custom"
+                    name="porto"
+                    required
+                    />
+                </div>
+            </div>
+        </div>
         <div>
             <input type="hidden" name="role" value="mahasiswa" />
         </div>
@@ -140,7 +187,7 @@
         </div>
         </form>
         <div class="text-center mt-3 regis">
-            <a href="{% url 'login' %}" class="btn btn-link">Sudah punya akun? Masuk</a>
+            <a href="{% url 'accounts:login' %}" class="btn btn-link">Sudah punya akun? Masuk</a>
           </div>
     </section>
   </body>

@@ -34,16 +34,6 @@ class KonfirmasiMagang(models.Model):
         return f"{self.mahasiswa.username} - {self.nama_perusahaan}"
 
 
-class WeeklyReport(models.Model):
-    konfirmasi = models.ForeignKey(KonfirmasiMagang, on_delete=models.CASCADE, related_name='weekly_reports')
-    week_start = models.DateField()
-    report_text = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Report {self.konfirmasi.mahasiswa.username} ({self.week_start})"
-
-
 class EvaluasiTemplate(models.Model):
     """Template evaluasi yang dibuat oleh admin untuk UTS/UAS"""
     nama = models.CharField(max_length=200)
@@ -181,3 +171,129 @@ class SertifikatCoop(models.Model):
         if not self.nomor_sertifikat:
             self.nomor_sertifikat = self.generate_nomor_sertifikat()
         super().save(*args, **kwargs)
+
+
+class WeeklyReport(models.Model):
+    """Model untuk laporan mingguan mahasiswa yang belum mendapat tempat magang"""
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='weekly_reports')
+    week_number = models.PositiveIntegerField()
+    week_start_date = models.DateField()
+    week_end_date = models.DateField()
+    
+    # Konten laporan
+    main_activities = models.TextField(
+        verbose_name="Aktivitas Utama",
+        help_text="Aktivitas pencarian magang yang dilakukan minggu ini"
+    )
+    target_achievement = models.TextField(
+        verbose_name="Pencapaian Target",
+        help_text="Target yang berhasil dicapai minggu ini"
+    )
+    companies_applied = models.TextField(
+        verbose_name="Perusahaan yang Dilamar",
+        help_text="Daftar perusahaan yang sudah dilamar/dihubungi"
+    )
+    interview_status = models.TextField(
+        verbose_name="Status Interview",
+        help_text="Update mengenai interview yang sudah/akan dilakukan",
+        blank=True
+    )
+    challenges_faced = models.TextField(
+        verbose_name="Kendala yang Dihadapi",
+        help_text="Kendala atau tantangan dalam mencari magang",
+        blank=True
+    )
+    help_needed = models.TextField(
+        verbose_name="Bantuan yang Diperlukan",
+        help_text="Bantuan apa yang dibutuhkan dari admin/mentor",
+        blank=True
+    )
+    next_week_plan = models.TextField(
+        verbose_name="Rencana Minggu Depan",
+        help_text="Rencana aktivitas untuk minggu depan"
+    )
+    
+    # Progress tracking
+    progress_percentage = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Persentase Progress",
+        help_text="Estimasi progress pencarian magang (0-100%)"
+    )
+    
+    # Status
+    application_status = models.CharField(
+        max_length=50,
+        choices=[
+            ('searching', 'Masih Mencari'),
+            ('applied', 'Sudah Melamar'),
+            ('interview_scheduled', 'Interview Dijadwalkan'),
+            ('waiting_response', 'Menunggu Respon'),
+            ('accepted', 'Diterima'),
+            ('rejected', 'Ditolak'),
+        ],
+        default='searching',
+        verbose_name="Status Aplikasi"
+    )
+    
+    # Metadata
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    is_late = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['student', 'week_start_date']
+        ordering = ['-week_start_date']
+    
+    def __str__(self):
+        return f"Laporan Minggu {self.week_number} - {self.student.get_full_name()}"
+
+
+class DeadlineReminder(models.Model):
+    """Model untuk pengaturan deadline dan reminder sistem"""
+    deadline_date = models.DateField(
+        verbose_name="Tanggal Deadline",
+        help_text="Batas waktu untuk mendapatkan tempat magang"
+    )
+    reminder_frequency_days = models.PositiveIntegerField(
+        default=7,
+        verbose_name="Frekuensi Reminder (hari)",
+        help_text="Setiap berapa hari reminder dikirim"
+    )
+    description = models.TextField(
+        verbose_name="Deskripsi",
+        help_text="Deskripsi atau instruksi mengenai deadline ini"
+    )
+    email_reminder_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Email Reminder Aktif",
+        help_text="Apakah sistem mengirim email reminder otomatis"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Status Aktif",
+        help_text="Apakah pengaturan reminder ini aktif"
+    )
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Deadline: {self.deadline_date} (Aktif: {'Ya' if self.is_active else 'Tidak'})"
+    
+    @property
+    def days_until_deadline(self):
+        """Hitung hari hingga deadline"""
+        from django.utils import timezone
+        delta = self.deadline_date - timezone.now().date()
+        return delta.days
+    
+    @property
+    def is_overdue(self):
+        """Cek apakah deadline sudah terlewati"""
+        from django.utils import timezone
+        return timezone.now().date() > self.deadline_date

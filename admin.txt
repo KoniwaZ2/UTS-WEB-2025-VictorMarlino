@@ -1,0 +1,6 @@
+Email Admin : admin@gmail.com
+Password : MasukAja1
+
+admin db
+Username : admin
+Password : 123

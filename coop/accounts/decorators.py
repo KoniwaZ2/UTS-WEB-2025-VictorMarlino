@@ -10,12 +10,12 @@ def role_required(required_role):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             if not request.user.is_authenticated:
-                return redirect('login')
+                return redirect('accounts:login')
             
             if request.user.role != required_role:
                 messages.error(request, 'Anda tidak memiliki akses ke halaman ini.')
-                return redirect('login')
-            
+                return redirect('accounts:login')
+
             return view_func(request, *args, **kwargs)
         return wrapper
     return decorator

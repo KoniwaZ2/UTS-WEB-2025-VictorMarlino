@@ -289,11 +289,6 @@ def lihat_laporan(request, konfirmasi_id):
 @login_required
 def selesai_konfirmasi(request, konfirmasi_id):
     """Tandai konfirmasi magang sebagai selesai atau selesaikan proses bimbingan.
-
-    This action is POST-only to avoid accidental GET side-effects. It checks
-    that the current user is the supervisor for the konfirmasi and then sets
-    the konfirmasi status to 'finished' (or deletes/archives depending on your
-    app policy). Here we set status='finished' and add a success message.
     """
     if request.method != 'POST':
         messages.error(request, "Metode tidak diperbolehkan.")
@@ -309,6 +304,9 @@ def selesai_konfirmasi(request, konfirmasi_id):
     # Mark as completed (use existing status choice defined in model)
     konfirmasi.status = 'completed'
     konfirmasi.save()
+
+    # Update all evaluations for this konfirmasi to 'finished'
+    EvaluasiSupervisor.objects.filter(konfirmasi=konfirmasi).update(status='finished')
 
     messages.success(request, "Konfirmasi magang berhasil diselesaikan.")
     return redirect('jobs:supervisor_dashboard')

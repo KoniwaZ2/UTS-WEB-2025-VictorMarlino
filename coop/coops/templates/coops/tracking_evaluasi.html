@@ -150,6 +150,10 @@
                                                         <span class="badge bg-success">
                                                             <i class="bi bi-check-circle me-1"></i>Sudah Diisi
                                                         </span>
+                                                    {% elif detail.status == 'finished' %}
+                                                        <span class="badge bg-success">
+                                                            <i class="bi bi-check-circle-fill me-1"></i>Selesai
+                                                        </span>
                                                     {% elif detail.status == 'pending' %}
                                                         <span class="badge bg-warning text-dark">
                                                             <i class="bi bi-clock me-1"></i>Pending
@@ -170,15 +174,23 @@
                                                 <td>
                                                     <div class="btn-group btn-group-sm" role="group">
                                                         {% if detail.status != 'completed' %}
-                                                            <button class="btn btn-outline-primary" onclick="sendReminder('{{ detail.konfirmasi.id }}', '{{ data.template.id }}')">
-                                                                <i class="bi bi-envelope"></i>
-                                                            </button>
+                                                            {% if detail.status != 'finished' %}
+                                                                <button class="btn btn-outline-primary" onclick="sendReminder('{{ detail.konfirmasi.id }}', '{{ data.template.id }}')">
+                                                                    <i class="bi bi-envelope"></i>
+                                                                </button>
+                                                            {% endif %}
+                                                            {% else %}
                                                         {% endif %}
-                                                        {% if detail.status == 'completed' %}
+                                                        {% if detail.status == 'completed'%}
                                                             <button class="btn btn-outline-info" onclick="viewEvaluation('{{ detail.konfirmasi.id }}', '{{ data.template.id }}')">
                                                                 <i class="bi bi-eye"></i>
                                                             </button>
                                                         {% endif %}
+                                                        {% if detail.status == 'finished' %}
+                                                                <button class="btn btn-outline-info" onclick="viewEvaluation('{{ detail.konfirmasi.id }}', '{{ data.template.id }}')">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </button>
+                                                            {% endif %}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -251,7 +263,7 @@
 
         function downloadResults(templateId) {
             // Navigate to download endpoint
-            window.location.href = '/admin/coops/evaluasitemplate/' + templateId + '/download/';
+            alert('Fitur download akan diimplementasikan');
         }
 
         function sendToKaprodi(templateId) {

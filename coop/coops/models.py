@@ -57,6 +57,7 @@ class EvaluasiSupervisor(models.Model):
     status = models.CharField(max_length=20, choices=[
         ('pending', 'Belum Diisi'),
         ('completed', 'Sudah Diisi'),
+        ('finished', 'Selesai'),
     ], default='pending')
     submitted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

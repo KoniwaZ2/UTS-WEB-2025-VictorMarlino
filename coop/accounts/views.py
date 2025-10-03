@@ -101,7 +101,7 @@ def register(request):
                     )
 
                 messages.success(request, "Registrasi berhasil! Silakan masuk.")
-                return redirect("login")
+                return redirect("accounts:login")
             except IntegrityError:
                 messages.error(request, "Terjadi kesalahan pada server saat membuat akun. Silakan coba lagi.")
                 return render(request, "accounts/register.html")

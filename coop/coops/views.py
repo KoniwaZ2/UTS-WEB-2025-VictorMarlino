@@ -216,7 +216,7 @@ def tracking_evaluasi(request):
 
         # Calculate statistics
         total_supervisors = accepted_konfirmasi.count()
-        completed = evaluations.filter(status='completed').count()
+        completed = evaluations.filter(status__in=['completed', 'finished']).count()
         pending = total_supervisors - completed
         completion_rate = int((completed / total_supervisors) * 100) if total_supervisors > 0 else 0
 
